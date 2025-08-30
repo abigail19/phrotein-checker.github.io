@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image-Based Multiple Choice Quiz</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#10B981',
+                        accent: '#F59E0B',
+                        danger: '#EF4444',
+                        dark: '#1F2937',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .card-shadow {
+                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            }
+            .btn-hover {
+                @apply transition-all duration-300 hover:shadow-lg transform hover:-translate-y-0.5;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans text-dark">
+    <!-- Header -->
+    <header class="bg-primary-600 text-white shadow-md">
+        <div class="container mx-auto px-4 py-6">
+            <h1 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold">
+                <i class="fa fa-graduation-cap mr-2"></i>Image Quiz Builder
+            </h1>
+            <p class="text-blue-100 mt-1">Create and practice with image-based multiple choice questions</p>
+        </div>
+    </header>
+
+    <!-- Main Navigation -->
+    <nav class="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div class="container mx-auto px-4">
+            <div class="flex overflow-x-auto py-4 space-x-6 text-sm font-medium">
+                <button id="nav-add" class="nav-btn text-primary border-b-2 border-primary whitespace-nowrap">
+                    <i class="fa fa-plus-circle mr-1"></i> Add Question
+                </button>
+                <button id="nav-practice" class="nav-btn text-gray-600 hover:text-primary whitespace-nowrap">
+                    <i class="fa fa-play-circle mr-1"></i> Practice
+                </button>
+                <button id="nav-library" class="nav-btn text-gray-600 hover:text-primary whitespace-nowrap">
+                    <i class="fa fa-list mr-1"></i> Question Library
+                </button>
+                <button id="nav-export" class="nav-btn text-gray-600 hover:text-primary whitespace-nowrap">
+                    <i class="fa fa-download mr-1"></i> Export to Excel
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        <!-- Add Question Section -->
+        <section id="section-add" class="section-content">
+            <div class="max-w-3xl mx-auto bg-white rounded-xl p-6 card-shadow">
+                <h2 class="text-2xl font-bold mb-6 text-gray-800">
+                    <i class="fa fa-plus-circle text-primary mr-2"></i>Add New Question
+                </h2>
+                
+                <form id="question-form" class="space-y-6">
+                    <div>
+                        <label for="question-image" class="block text-sm font-medium text-gray-700 mb-2">
+                            Upload Question Image
+                        </label>
+                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-primary transition-colors">
+                            <input type="file" id="question-image" accept="image/*" class="hidden">
+                            <label for="question-image" class="cursor-pointer">
+                                <i class="fa fa-cloud-upload text-4xl text-gray-400 mb-2"></i>
+                                <p class="text-gray-600">Click to upload or drag and drop an image</p>
+                                <p class="text-xs text-gray-500 mt-1">Supports JPG, PNG, GIF</p>
+                            </label>
+                            <div id="image-preview" class="mt-4 hidden">
+                                <img id="preview-img" src="" alt="Question preview" class="max-w-full h-auto rounded-md mx-auto">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label for="correct-answer" class="block text-sm font-medium text-gray-700 mb-2">
+                            Correct Answer (A, B, C, or D)
+                        </label>
+                        <div class="grid grid-cols-4 gap-3">
+                            <button type="button" class="answer-option py-3 border-2 border-gray-300 rounded-md hover:border-primary transition-colors" data-answer="A">A</button>
+                            <button type="button" class="answer-option py-3 border-2 border-gray-300 rounded-md hover:border-primary transition-colors" data-answer="B">B</button>
+                            <button type="button" class="answer-option py-3 border-2 border-gray-300 rounded-md hover:border-primary transition-colors" data-answer="C">C</button>
+                            <button type="button" class="answer-option py-3 border-2 border-gray-300 rounded-md hover:border-primary transition-colors" data-answer="D">D</button>
+                        </div>
+                        <input type="hidden" id="correct-answer" name="correct-answer" required>
+                    </div>
+                    
+                    <div class="pt-4">
+                        <button type="submit" class="bg-primary hover:bg-primary/90 text-white font-medium py-3 px-6 rounded-lg btn-hover w-full md:w-auto">
+                            <i class="fa fa-save mr-2"></i>Save Question
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- Practice Section -->
+        <section id="section-practice" class="section-content hidden">
+            <div class="max-w-3xl mx-auto">
+                <div class="bg-white rounded-xl p-6 card-shadow mb-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">
+                            <i class="fa fa-play-circle text-accent mr-2"></i>Practice Mode
+                        </h2>
+                        <span id="question-count" class="bg-gray-100 px-3 py-1 rounded-full text-sm font-medium">
+                            Questions: 0
+                        </span>
+                    </div>
+                    
+                    <div id="practice-container" class="min-h-[400px] flex flex-col items-center justify-center">
+                        <div id="no-questions-message" class="text-center p-8">
+                            <i class="fa fa-question-circle text-6xl text-gray-300 mb-4"></i>
+                            <p class="text-gray-500">No questions available yet</p>
+                            <p class="text-gray-400 text-sm mt-2">Add some questions first to start practicing</p>
+                            <button id="go-to-add" class="mt-4 bg-primary text-white px-4 py-2 rounded-lg btn-hover">
+                                Add Questions
+                            </button>
+                        </div>
+                        
+                        <div id="question-display" class="w-full hidden">
+                            <div class="mb-6">
+                                <img id="practice-image" src="" alt="Question image" class="max-w-full h-auto rounded-lg shadow-sm">
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-4 mb-6">
+                                <button class="practice-option py-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-left px-4" data-option="A">A</button>
+                                <button class="practice-option py-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-left px-4" data-option="B">B</button>
+                                <button class="practice-option py-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-left px-4" data-option="C">C</button>
+                                <button class="practice-option py-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-left px-4" data-option="D">D</button>
+                            </div>
+                            
+                            <div id="feedback" class="mb-6 p-4 rounded-lg hidden"></div>
+                            
+                            <button id="next-question" class="bg-accent hover:bg-accent/90 text-white font-medium py-2 px-6 rounded-lg btn-hover w-full md:w-auto hidden">
+                                <i class="fa fa-arrow-right mr-1"></i>Next Question
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Question Library Section -->
+        <section id="section-library" class="section-content hidden">
+            <div class="max-w-4xl mx-auto">
+                <h2 class="text-2xl font-bold mb-6 text-gray-800">
+                    <i class="fa fa-list text-primary mr-2"></i>Question Library
+                </h2>
+                
+                <div id="library-empty" class="bg-white rounded-xl p-8 text-center card-shadow">
+                    <i class="fa fa-folder-open text-5xl text-gray-300 mb-4"></i>
+                    <p class="text-gray-500">Your question library is empty</p>
+                    <p class="text-gray-400 text-sm mt-2">Add questions to see them here</p>
+                </div>
+                
+                <div id="questions-list" class="grid grid-cols-1 md:grid-cols-2 gap-6 hidden">
+                    <!-- Questions will be dynamically inserted here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Export Section -->
+        <section id="section-export" class="section-content hidden">
+            <div class="max-w-2xl mx-auto bg-white rounded-xl p-6 card-shadow">
+                <h2 class="text-2xl font-bold mb-6 text-gray-800">
+                    <i class="fa fa-download text-primary mr-2"></i>Export Questions
+                </h2>
+                
+                <div id="export-info">
+                    <p class="text-gray-600 mb-4">Export your questions to an Excel file for backup or sharing.</p>
+                    
+                    <div class="bg-blue-50 border-l-4 border-primary p-4 mb-6">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <i class="fa fa-info-circle text-primary"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm text-blue-700">
+                                    The Excel file will contain the question image references and their correct answers.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <button id="export-excel" class="bg-primary hover:bg-primary/90 text-white font-medium py-3 px-6 rounded-lg btn-hover flex-1">
+                            <i class="fa fa-file-excel-o mr-2"></i>Export to Excel
+                        </button>
+                        <button id="clear-all" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-3 px-6 rounded-lg btn-hover flex-1">
+                            <i class="fa fa-trash mr-2"></i>Clear All Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Success Notification -->
+    <div id="notification" class="fixed bottom-6 right-6 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 flex items-center">
+        <i class="fa fa-check-circle mr-2"></i>
+        <span id="notification-text">Question saved successfully!</span>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-gray-400 py-8 mt-12">
+        <div class="container mx-auto px-4 text-center text-sm">
+            <p>Image Quiz Builder &copy; 2023</p>
+            <p class="mt-1">All data is stored locally in your browser</p>
+        </div>
+    </footer>
+
+    <script>
+        // Global state
+        let questions = JSON.parse(localStorage.getItem('quizQuestions')) || [];
+        let selectedAnswer = null;
+        let currentQuestionIndex = -1;
+
+        // DOM Elements
+        const navButtons = document.querySelectorAll('.nav-btn');
+        const sections = document.querySelectorAll('.section-content');
+        const questionForm = document.getElementById('question-form');
+        const imageInput = document.getElementById('question-image');
+        const imagePreview = document.getElementById('image-preview');
+        const previewImg = document.getElementById('preview-img');
+        const answerOptions = document.querySelectorAll('.answer-option');
+        const correctAnswerInput = document.getElementById('correct-answer');
+        const notification = document.getElementById('notification');
+        const notificationText = document.getElementById('notification');
+        const questionCountEl = document.getElementById('question-count');
+        const noQuestionsMessage = document.getElementById('no-questions-message');
+        const questionDisplay = document.getElementById('question-display');
+        const practiceImage = document.getElementById('practice-image');
+        const practiceOptions = document.querySelectorAll('.practice-option');
+        const feedbackEl = document.getElementById('feedback');
+        const nextQuestionBtn = document.getElementById('next-question');
+        const goToAddBtn = document.getElementById('go-to-add');
+        const questionsList = document.getElementById('questions-list');
+        const libraryEmpty = document.getElementById('library-empty');
+        const exportExcelBtn = document.getElementById('export-excel');
+        const clearAllBtn = document.getElementById('clear-all');
+
+        // Navigation
+        navButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                // Remove active class from all nav buttons
+                navButtons.forEach(btn => {
+                    btn.classList.remove('text-primary', 'border-b-2', 'border-primary');
+                    btn.classList.add('text-gray-600');
+                });
+                
+                // Add active class to clicked button
+                button.classList.remove('text-gray-600');
+                button.classList.add('text-primary', 'border-b-2', 'border-primary');
+                
+                // Hide all sections
+                sections.forEach(section => section.classList.add('hidden'));
+                
+                // Show corresponding section
+                const sectionId = button.id.replace('nav-', 'section-');
+                document.getElementById(sectionId).classList.remove('hidden');
+                
+                // Special handling for sections that need data refresh
+                if (sectionId === 'section-practice') {
+                    updatePracticeMode();
+                } else if (sectionId === 'section-library') {
+                    renderQuestionLibrary();
+                }
+            });
+        });
+
+        // Image upload preview
+        imageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    previewImg.src = event.target.result;
+                    imagePreview.classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Answer selection
+        answerOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                // Remove selection from all options
+                answerOptions.forEach(opt => {
+                    opt.classList.remove('bg-primary/10', 'border-primary');
+                    opt.classList.add('border-gray-300');
+                });
+                
+                // Select clicked option
+                option.classList.remove('border-gray-300');
+                option.classList.add('bg-primary/10', 'border-primary');
+                
+                // Set the value
+                selectedAnswer = option.dataset.answer;
+                correctAnswerInput.value = selectedAnswer;
+            });
+        });
+
+        // Form submission
+        questionForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            if (!imageInput.files[0] || !selectedAnswer) {
+                showNotification('Please upload an image and select a correct answer', 'error');
+                return;
+            }
+            
+            // Read the image file and save as base64
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const newQuestion = {
+                    id: Date.now(),
+                    image: event.target.result,
+                    answer: selectedAnswer,
+                    added: new Date().toISOString()
+                };
+                
+                // Add to questions array and save to localStorage
+                questions.push(newQuestion);
+                saveQuestions();
+                
+                // Reset form
+                questionForm.reset();
+                imagePreview.classList.add('hidden');
+                answerOptions.forEach(opt => {
+                    opt.classList.remove('bg-primary/10', 'border-primary');
+                    opt.classList.add('border-gray-300');
+                });
+                selectedAnswer = null;
+                
+                // Show notification
+                showNotification('Question saved successfully!', 'success');
+                
+                // Update question count display
+                updateQuestionCount();
+            };
+            
+            reader.readAsDataURL(imageInput.files[0]);
+        });
+
+        // Practice mode functions
+        function updatePracticeMode() {
+            updateQuestionCount();
+            
+            if (questions.length === 0) {
+                noQuestionsMessage.classList.remove('hidden');
+                questionDisplay.classList.add('hidden');
+            } else {
+                noQuestionsMessage.classList.add('hidden');
+                questionDisplay.classList.remove('hidden');
+                loadRandomQuestion();
+            }
+        }
+
+        function loadRandomQuestion() {
+            // Reset UI
+            practiceOptions.forEach(option => {
+                option.classList.remove('bg-green-100', 'border-green-500', 'bg-red-100', 'border-red-500');
+                option.classList.add('border-gray-300');
+                option.disabled = false;
+            });
+            feedbackEl.classList.add('hidden');
+            nextQuestionBtn.classList.add('hidden');
+            
+            // Get random question that's not the current one if possible
+            let randomIndex;
+            if (questions.length > 1 && currentQuestionIndex !== -1) {
+                do {
+                    randomIndex = Math.floor(Math.random() * questions.length);
+                } while (randomIndex === currentQuestionIndex);
+            } else {
+                randomIndex = Math.floor(Math.random() * questions.length);
+            }
+            
+            currentQuestionIndex = randomIndex;
+            const question = questions[randomIndex];
+            
+            // Update UI with question
+            practiceImage.src = question.image;
+        }
+
+        // Practice option selection
+        practiceOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                const selectedOption = option.dataset.option;
+                const correctAnswer = questions[currentQuestionIndex].answer;
+                
+                // Disable all options
+                practiceOptions.forEach(opt => opt.disabled = true);
+                
+                // Show correct/incorrect
+                if (selectedOption === correctAnswer) {
+                    option.classList.remove('border-gray-300');
+                    option.classList.add('bg-green-100', 'border-green-500');
+                    feedbackEl.textContent = 'Correct! Well done.';
+                    feedbackEl.classList.remove('hidden', 'bg-red-50', 'text-red-700', 'border-l-4', 'border-red-500');
+                    feedbackEl.classList.add('bg-green-50', 'text-green-700', 'border-l-4', 'border-green-500');
+                } else {
+                    option.classList.remove('border-gray-300');
+                    option.classList.add('bg-red-100', 'border-red-500');
+                    
+                    // Highlight correct answer
+                    practiceOptions.forEach(opt => {
+                        if (opt.dataset.option === correctAnswer) {
+                            opt.classList.remove('border-gray-300');
+                            opt.classList.add('bg-green-100', 'border-green-500');
+                        }
+                    });
+                    
+                    feedbackEl.textContent = `Incorrect. The correct answer is ${correctAnswer}.`;
+                    feedbackEl.classList.remove('hidden', 'bg-green-50', 'text-green-700', 'border-l-4', 'border-green-500');
+                    feedbackEl.classList.add('bg-red-50', 'text-red-700', 'border-l-4', 'border-red-500');
+                }
+                
+                feedbackEl.classList.remove('hidden');
+                nextQuestionBtn.classList.remove('hidden');
+            });
+        });
+
+        // Next question button
+        nextQuestionBtn.addEventListener('click', loadRandomQuestion);
+
+        // Go to add questions from practice mode
+        goToAddBtn.addEventListener('click', () => {
+            document.getElementById('nav-add').click();
+        });
+
+        // Render question library
+        function renderQuestionLibrary() {
+            if (questions.length === 0) {
+                libraryEmpty.classList.remove('hidden');
+                questionsList.classList.add('hidden');
+                return;
+            }
+            
+            libraryEmpty.classList.add('hidden');
+            questionsList.classList.remove('hidden');
+            questionsList.innerHTML = '';
+            
+            // Sort questions by date added (newest first)
+            const sortedQuestions = [...questions].sort((a, b) => new Date(b.added) - new Date(a.added));
+            
+            sortedQuestions.forEach((question, index) => {
+                const questionCard = document.createElement('div');
+                questionCard.className = 'bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow';
+                
+                questionCard.innerHTML = `
+                    <div class="p-4">
+                        <div class="relative pb-[75%] mb-3 overflow-hidden rounded">
+                            <img src="${question.image}" alt="Question ${index + 1}" class="absolute inset-0 w-full h-full object-cover">
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="bg-primary/10 text-primary px-2 py-1 rounded text-sm font-medium">
+                                Correct: ${question.answer}
+                            </span>
+                            <button class="delete-question text-gray-400 hover:text-danger transition-colors" data-id="${question.id}">
+                                <i class="fa fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                questionsList.appendChild(questionCard);
+            });
+            
+            // Add event listeners to delete buttons
+            document.querySelectorAll('.delete-question').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const questionId = parseInt(e.currentTarget.dataset.id);
+                    deleteQuestion(questionId);
+                });
+            });
+        }
+
+        // Delete question
+        function deleteQuestion(id) {
+            if (confirm('Are you sure you want to delete this question?')) {
+                questions = questions.filter(question => question.id !== id);
+                saveQuestions();
+                renderQuestionLibrary();
+                updateQuestionCount();
+                showNotification('Question deleted', 'success');
+            }
+        }
+
+        // Export to Excel
+        exportExcelBtn.addEventListener('click', () => {
+            if (questions.length === 0) {
+                showNotification('No questions to export', 'error');
+                return;
+            }
+            
+            // Prepare data for Excel
+            const exportData = questions.map((question, index) => {
+                return {
+                    'Question Number': index + 1,
+                    'Correct Answer': question.answer,
+                    'Added Date': new Date(question.added).toLocaleString()
+                };
+            });
+            
+            // Create workbook and worksheet
+            const worksheet = XLSX.utils.json_to_sheet(exportData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Quiz Questions');
+            
+            // Export the file
+            XLSX.writeFile(workbook, 'quiz_questions.xlsx');
+            showNotification('Questions exported to Excel', 'success');
+        });
+
+        // Clear all data
+        clearAllBtn.addEventListener('click', () => {
+            if (confirm('Are you sure you want to delete all questions? This action cannot be undone.')) {
+                questions = [];
+                saveQuestions();
+                updateQuestionCount();
+                renderQuestionLibrary();
+                updatePracticeMode();
+                showNotification('All questions deleted', 'success');
+            }
+        });
+
+        // Helper functions
+        function saveQuestions() {
+            localStorage.setItem('quizQuestions', JSON.stringify(questions));
+        }
+
+        function showNotification(message, type = 'success') {
+            notificationText.textContent = message;
+            
+            if (type === 'error') {
+                notification.classList.remove('bg-green-500');
+                notification.classList.add('bg-danger');
+            } else {
+                notification.classList.remove('bg-danger');
+                notification.classList.add('bg-green-500');
+            }
+            
+            // Show notification
+            notification.classList.remove('translate-y-20', 'opacity-0');
+            notification.classList.add('translate-y-0', 'opacity-100');
+            
+            // Hide after 3 seconds
+            setTimeout(() => {
+                notification.classList.remove('translate-y-0', 'opacity-100');
+                notification.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        function updateQuestionCount() {
+            questionCountEl.textContent = `Questions: ${questions.length}`;
+        }
+
+        // Initialize the app
+        function init() {
+            updateQuestionCount();
+        }
+
+        // Start the app
+        init();
+    </script>
+</body>
+</html>
